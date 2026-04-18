@@ -2,18 +2,63 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <cctype>
 
 using namespace std;
 namespace fs = std::filesystem;
 
 // Rule class
 class Rule {
+private:
+    string toLowerCase(string text) {
+        for (int i = 0; i < text.length(); i++) {
+            text[i] = tolower(text[i]);
+        }
+        return text;
+    }
+
 public:
     string getFolder(string ext, string filename) {
-        if (ext == ".jpg") return "Images";
-        if (ext == ".pdf") return "Documents";
-        if (ext == ".mp3") return "Audio";
-        if (ext == ".cpp") return "Code";
+        ext = toLowerCase(ext);
+        filename = toLowerCase(filename);
+
+        // Images
+        if (ext == ".jpg" || ext == ".jpeg") return "Images/JPG";
+        if (ext == ".png") return "Images/PNG";
+        if (ext == ".gif") return "Images/GIF";
+        if (ext == ".bmp") return "Images/BMP";
+
+        // Audio
+        if (ext == ".mp3") return "Audio/MP3";
+        if (ext == ".wav") return "Audio/WAV";
+
+        // Videos
+        if (ext == ".mp4") return "Videos/MP4";
+        if (ext == ".mkv") return "Videos/MKV";
+        if (ext == ".avi") return "Videos/AVI";
+
+        // Documents
+        if (ext == ".pdf") return "Documents/PDFs";
+        if (ext == ".docx" || ext == ".doc") return "Documents/Word";
+        if (ext == ".txt") return "Documents/Text";
+        if (ext == ".xlsx" || ext == ".xls") return "Documents/Excel";
+        if (ext == ".pptx" || ext == ".ppt") return "Documents/PowerPoint";
+
+        // Archives
+        if (ext == ".zip") return "Archives/ZIP";
+        if (ext == ".rar") return "Archives/RAR";
+
+        // Code
+        if (ext == ".cpp") return "Code/C++";
+        if (ext == ".py") return "Code/Python";
+        if (ext == ".java") return "Code/Java";
+        if (ext == ".html") return "Code/HTML";
+        if (ext == ".css") return "Code/CSS";
+        if (ext == ".js") return "Code/JavaScript";
+
+        // Projects
+        if (filename.find("project") != string::npos) return "Projects";
+
         return "Others";
     }
 };
