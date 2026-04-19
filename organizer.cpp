@@ -65,21 +65,63 @@ public:
 
 // Logger class
 class Logger {
+private:
+    string logFileName;
+
 public:
-    void log(string message) {
-        ofstream file("log.txt", ios::app);
+    string addTxtExtension(string name) {
+        if (name.find(".txt") == string::npos) {
+            name += ".txt";
+        }
+        return name;
+    }
+
+    bool fileExists(string name) {
+        return fs::exists(name);
+    }
+
+    bool createLogFile(string name) {
+        logFileName = name;
+        ofstream file(logFileName, ios::out);
+
+        if (!file.is_open()) {
+            return false;
+        }
+
+        file << "===== File Organizer Log =====\n\n";
+        file.close();
+        return true;
+    }
+
+    void logMove(string filename, string oldPath, string newPath, string folder) {
+        ofstream file(logFileName, ios::app);
+
         if (file.is_open()) {
-            file << message << endl;
+            file << "Moved File: " << filename << "\n";
+            file << "From: " << oldPath << "\n";
+            file << "To: " << newPath << "\n";
+            file << "Category: " << folder << "\n";
+            file << "-----------------------------\n";
+            file.close();
+        }
+    }
+
+    void logError(string filename) {
+        ofstream file(logFileName, ios::app);
+
+        if (file.is_open()) {
+            file << "Error moving file: " << filename << "\n";
+            file << "-----------------------------\n";
             file.close();
         }
     }
 
     void viewLog() {
-        ifstream file("log.txt");
+        ifstream file(logFileName);
         string line;
 
         if (file.is_open()) {
-            cout << "\n--- Log File ---\n";
+            cout << "\n--- Log File: " << logFileName << " ---\n";
             while (getline(file, line)) {
                 cout << line << endl;
             }
@@ -87,6 +129,10 @@ public:
         } else {
             cout << "Log file not found.\n";
         }
+    }
+
+    string getLogFileName() {
+        return logFileName;
     }
 };
 
@@ -119,13 +165,14 @@ public:
                 string newPath = newFolderPath + "/" + filename;
 
                 try {
+                    string oldPath = entry.path().string();
                     fs::rename(entry.path(), newPath);
-                    string msg = "Moved: " + filename + " -> " + folder;
-                    cout << msg << endl;
-                    logger.log(msg);
+                    cout << "Moved: " << filename << " -> " << folder << endl;
+                    logger.logMove(filename, oldPath, newPath, folder);
                 }
                 catch (...) {
                     cout << "Error moving file: " << filename << endl;
+                    logger.logError(filename);
                 }
             }
         }
@@ -142,13 +189,62 @@ private:
 public:
     Menu() : organizer(logger) {}
 
+    bool askYesNo(string message) {
+        char choice;
+        cout << message;
+        cin >> choice;
+        cin.ignore();
+        return (choice == 'Y' || choice == 'y');
+    }
+
     void setFolderPath() {
-        cout << "Enter folder path: ";
-        getline(cin, path);
+        while (true) {
+            cout << "Enter folder path: ";
+            getline(cin, path);
+
+            if (fs::exists(path) && fs::is_directory(path)) {
+                break;
+            } else {
+                cout << "Invalid folder path. Try again.\n";
+            }
+        }
+    }
+
+    void setLogFile() {
+        while (true) {
+            string name;
+            cout << "Enter log file name: ";
+            getline(cin, name);
+
+            name = logger.addTxtExtension(name);
+
+            if (logger.fileExists(name)) {
+                cout << "Log file already exists.\n";
+                if (askYesNo("Do you want to overwrite it? (Y/N): ")) {
+                    if (logger.createLogFile(name)) {
+                        cout << "Log file created: " << name << endl;
+                        break;
+                    } else {
+                        cout << "Could not create log file.\n";
+                    }
+                } else {
+                    cout << "Please enter another file name.\n";
+                }
+            } else {
+                if (logger.createLogFile(name)) {
+                    cout << "Log file created: " << name << endl;
+                    break;
+                } else {
+                    cout << "Could not create log file.\n";
+                }
+            }
+        }
     }
 
     void displayMenu() {
         cout << "\n===== File Organizer Menu =====\n";
+        cout << "Current Folder: " << path << endl;
+        cout << "Current Log File: " << logger.getLogFileName() << endl;
         cout << "1. View Files\n";
         cout << "2. Organize Files\n";
         cout << "3. View Log\n";
@@ -158,6 +254,7 @@ public:
 
     void run() {
         setFolderPath();
+        setLogFile();
 
         int choice;
         do {
