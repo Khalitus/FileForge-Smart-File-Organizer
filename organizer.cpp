@@ -145,10 +145,60 @@ private:
 public:
     Organizer(Logger& logRef) : logger(logRef) {}
 
+    string getDuplicateName(string folderPath, string filename) {
+        string newPath = folderPath + "/" + filename;
+
+        if (!fs::exists(newPath)) {
+            return newPath;
+        }
+
+        int count = 1;
+        while (true) {
+            string tempName = folderPath + "/copy" + to_string(count) + "_" + filename;
+            if (!fs::exists(tempName)) {
+                return tempName;
+            }
+            count++;
+        }
+    }
+
     void viewFiles(string path) {
-        cout << "\nFiles in directory:\n";
+        cout << "\nFiles and folders in directory:\n";
         for (auto& entry : fs::directory_iterator(path)) {
-            cout << entry.path().filename().string() << endl;
+            if (fs::is_regular_file(entry)) {
+                cout << "[FILE]   " << entry.path().filename().string() << endl;
+            } else if (fs::is_directory(entry)) {
+                cout << "[FOLDER] " << entry.path().filename().string() << endl;
+            }
+        }
+    }
+
+    void preview(string path) {
+        bool found = false;
+        cout << "\n===== Preview Before Organizing =====\n";
+
+        for (auto& entry : fs::directory_iterator(path)) {
+            if (fs::is_regular_file(entry)) {
+                found = true;
+
+                string ext = entry.path().extension().string();
+                string filename = entry.path().filename().string();
+                string folder = rule.getFolder(ext, filename);
+
+                string newFolderPath = path + "/" + folder;
+                string newPath = getDuplicateName(newFolderPath, filename);
+                string newName = fs::path(newPath).filename().string();
+
+                cout << filename << " -> " << folder;
+                if (newName != filename) {
+                    cout << " (will be saved as " << newName << ")";
+                }
+                cout << endl;
+            }
+        }
+
+        if (!found) {
+            cout << "No regular files found.\n";
         }
     }
 
@@ -162,12 +212,20 @@ public:
                 string newFolderPath = path + "/" + folder;
                 fs::create_directories(newFolderPath);
 
-                string newPath = newFolderPath + "/" + filename;
+                string newPath = getDuplicateName(newFolderPath, filename);
 
                 try {
                     string oldPath = entry.path().string();
                     fs::rename(entry.path(), newPath);
-                    cout << "Moved: " << filename << " -> " << folder << endl;
+
+                    cout << "Moved: " << filename << " -> " << folder;
+
+                    string newName = fs::path(newPath).filename().string();
+                    if (newName != filename) {
+                        cout << " (saved as " << newName << ")";
+                    }
+
+                    cout << endl;
                     logger.logMove(filename, oldPath, newPath, folder);
                 }
                 catch (...) {
@@ -246,9 +304,10 @@ public:
         cout << "Current Folder: " << path << endl;
         cout << "Current Log File: " << logger.getLogFileName() << endl;
         cout << "1. View Files\n";
-        cout << "2. Organize Files\n";
-        cout << "3. View Log\n";
-        cout << "4. Exit\n";
+        cout << "2. Preview Organization\n";
+        cout << "3. Organize Files\n";
+        cout << "4. View Log\n";
+        cout << "5. Exit\n";
         cout << "Enter choice: ";
     }
 
@@ -267,18 +326,21 @@ public:
                     organizer.viewFiles(path);
                     break;
                 case 2:
-                    organizer.organize(path);
+                    organizer.preview(path);
                     break;
                 case 3:
-                    logger.viewLog();
+                    organizer.organize(path);
                     break;
                 case 4:
+                    logger.viewLog();
+                    break;
+                case 5:
                     cout << "Exiting program...\n";
                     break;
                 default:
                     cout << "Invalid choice.\n";
             }
-        } while (choice != 4);
+        } while (choice != 5);
     }
 };
 
