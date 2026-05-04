@@ -142,8 +142,49 @@ private:
     Rule rule;
     Logger& logger;
 
+    int totalScanned;
+    int totalMoved;
+    int totalFailed;
+
+    int imageCount;
+    int documentCount;
+    int audioCount;
+    int videoCount;
+    int archiveCount;
+    int codeCount;
+    int projectCount;
+    int otherCount;
+
 public:
-    Organizer(Logger& logRef) : logger(logRef) {}
+    Organizer(Logger& logRef) : logger(logRef) {
+        resetStats();
+    }
+
+    void resetStats() {
+        totalScanned = 0;
+        totalMoved = 0;
+        totalFailed = 0;
+
+        imageCount = 0;
+        documentCount = 0;
+        audioCount = 0;
+        videoCount = 0;
+        archiveCount = 0;
+        codeCount = 0;
+        projectCount = 0;
+        otherCount = 0;
+    }
+
+    void updateStats(string folder) {
+        if (folder.find("Images") == 0) imageCount++;
+        else if (folder.find("Documents") == 0) documentCount++;
+        else if (folder.find("Audio") == 0) audioCount++;
+        else if (folder.find("Videos") == 0) videoCount++;
+        else if (folder.find("Archives") == 0) archiveCount++;
+        else if (folder.find("Code") == 0) codeCount++;
+        else if (folder.find("Projects") == 0) projectCount++;
+        else otherCount++;
+    }
 
     string getDuplicateName(string folderPath, string filename) {
         string newPath = folderPath + "/" + filename;
@@ -164,12 +205,18 @@ public:
 
     void viewFiles(string path) {
         cout << "\nFiles and folders in directory:\n";
-        for (auto& entry : fs::directory_iterator(path)) {
-            if (fs::is_regular_file(entry)) {
-                cout << "[FILE]   " << entry.path().filename().string() << endl;
-            } else if (fs::is_directory(entry)) {
-                cout << "[FOLDER] " << entry.path().filename().string() << endl;
+
+        try {
+            for (auto& entry : fs::directory_iterator(path)) {
+                if (fs::is_regular_file(entry)) {
+                    cout << "[FILE]   " << entry.path().filename().string() << endl;
+                } else if (fs::is_directory(entry)) {
+                    cout << "[FOLDER] " << entry.path().filename().string() << endl;
+                }
             }
+        }
+        catch (...) {
+            cout << "Could not open directory.\n";
         }
     }
 
@@ -177,63 +224,102 @@ public:
         bool found = false;
         cout << "\n===== Preview Before Organizing =====\n";
 
-        for (auto& entry : fs::directory_iterator(path)) {
-            if (fs::is_regular_file(entry)) {
-                found = true;
+        try {
+            for (auto& entry : fs::directory_iterator(path)) {
+                if (fs::is_regular_file(entry)) {
+                    found = true;
 
-                string ext = entry.path().extension().string();
-                string filename = entry.path().filename().string();
-                string folder = rule.getFolder(ext, filename);
+                    string ext = entry.path().extension().string();
+                    string filename = entry.path().filename().string();
+                    string folder = rule.getFolder(ext, filename);
 
-                string newFolderPath = path + "/" + folder;
-                string newPath = getDuplicateName(newFolderPath, filename);
-                string newName = fs::path(newPath).filename().string();
+                    string newFolderPath = path + "/" + folder;
+                    string newPath = getDuplicateName(newFolderPath, filename);
+                    string newName = fs::path(newPath).filename().string();
 
-                cout << filename << " -> " << folder;
-                if (newName != filename) {
-                    cout << " (will be saved as " << newName << ")";
+                    cout << filename << " -> " << folder;
+                    if (newName != filename) {
+                        cout << " (will be saved as " << newName << ")";
+                    }
+                    cout << endl;
                 }
-                cout << endl;
+            }
+
+            if (!found) {
+                cout << "No regular files found.\n";
             }
         }
-
-        if (!found) {
-            cout << "No regular files found.\n";
+        catch (...) {
+            cout << "Could not preview files.\n";
         }
     }
 
     void organize(string path) {
-        for (auto& entry : fs::directory_iterator(path)) {
-            if (fs::is_regular_file(entry)) {
-                string ext = entry.path().extension().string();
-                string filename = entry.path().filename().string();
-                string folder = rule.getFolder(ext, filename);
+        resetStats();
 
-                string newFolderPath = path + "/" + folder;
-                fs::create_directories(newFolderPath);
+        try {
+            for (auto& entry : fs::directory_iterator(path)) {
+                if (fs::is_regular_file(entry)) {
+                    totalScanned++;
 
-                string newPath = getDuplicateName(newFolderPath, filename);
+                    string ext = entry.path().extension().string();
+                    string filename = entry.path().filename().string();
+                    string folder = rule.getFolder(ext, filename);
 
-                try {
-                    string oldPath = entry.path().string();
-                    fs::rename(entry.path(), newPath);
+                    string newFolderPath = path + "/" + folder;
+                    fs::create_directories(newFolderPath);
 
-                    cout << "Moved: " << filename << " -> " << folder;
+                    string newPath = getDuplicateName(newFolderPath, filename);
 
-                    string newName = fs::path(newPath).filename().string();
-                    if (newName != filename) {
-                        cout << " (saved as " << newName << ")";
+                    try {
+                        string oldPath = entry.path().string();
+                        fs::rename(entry.path(), newPath);
+
+                        cout << "Moved: " << filename << " -> " << folder;
+
+                        string newName = fs::path(newPath).filename().string();
+                        if (newName != filename) {
+                            cout << " (saved as " << newName << ")";
+                        }
+
+                        cout << endl;
+
+                        logger.logMove(filename, oldPath, newPath, folder);
+
+                        totalMoved++;
+                        updateStats(folder);
                     }
-
-                    cout << endl;
-                    logger.logMove(filename, oldPath, newPath, folder);
-                }
-                catch (...) {
-                    cout << "Error moving file: " << filename << endl;
-                    logger.logError(filename);
+                    catch (...) {
+                        cout << "Error moving file: " << filename << endl;
+                        logger.logError(filename);
+                        totalFailed++;
+                    }
                 }
             }
+
+            cout << "\nFiles organized successfully!\n";
+            showReport();
         }
+        catch (...) {
+            cout << "Could not access directory.\n";
+        }
+    }
+
+    void showReport() {
+        cout << "\n===== Statistics Report =====\n";
+        cout << "Total files scanned: " << totalScanned << endl;
+        cout << "Total files moved: " << totalMoved << endl;
+        cout << "Total failed moves: " << totalFailed << endl;
+
+        cout << "\nCategory-wise summary:\n";
+        cout << "Images: " << imageCount << endl;
+        cout << "Documents: " << documentCount << endl;
+        cout << "Audio: " << audioCount << endl;
+        cout << "Videos: " << videoCount << endl;
+        cout << "Archives: " << archiveCount << endl;
+        cout << "Code: " << codeCount << endl;
+        cout << "Projects: " << projectCount << endl;
+        cout << "Others: " << otherCount << endl;
     }
 };
 
@@ -316,6 +402,7 @@ public:
         setLogFile();
 
         int choice;
+
         do {
             displayMenu();
             cin >> choice;
@@ -325,21 +412,27 @@ public:
                 case 1:
                     organizer.viewFiles(path);
                     break;
+
                 case 2:
                     organizer.preview(path);
                     break;
+
                 case 3:
                     organizer.organize(path);
                     break;
+
                 case 4:
                     logger.viewLog();
                     break;
+
                 case 5:
                     cout << "Exiting program...\n";
                     break;
+
                 default:
                     cout << "Invalid choice.\n";
             }
+
         } while (choice != 5);
     }
 };
