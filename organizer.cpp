@@ -390,10 +390,9 @@ public:
         cout << "Current Folder: " << path << endl;
         cout << "Current Log File: " << logger.getLogFileName() << endl;
         cout << "1. View Files\n";
-        cout << "2. Preview Organization\n";
-        cout << "3. Organize Files\n";
-        cout << "4. View Log\n";
-        cout << "5. Exit\n";
+        cout << "2. Organize Files\n";
+        cout << "3. View Log\n";
+        cout << "4. Exit\n";
         cout << "Enter choice: ";
     }
 
@@ -415,17 +414,18 @@ public:
 
                 case 2:
                     organizer.preview(path);
+                    if (askYesNo("\nDo you want to organize these files now? (Y/N): ")) {
+                        organizer.organize(path);
+                    } else {
+                        cout << "Organization cancelled.\n";
+                    }
                     break;
 
                 case 3:
-                    organizer.organize(path);
-                    break;
-
-                case 4:
                     logger.viewLog();
                     break;
 
-                case 5:
+                case 4:
                     cout << "Exiting program...\n";
                     break;
 
@@ -433,7 +433,7 @@ public:
                     cout << "Invalid choice.\n";
             }
 
-        } while (choice != 5);
+        } while (choice != 4);
     }
 };
 
