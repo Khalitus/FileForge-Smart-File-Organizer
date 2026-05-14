@@ -106,6 +106,18 @@ public:
         }
     }
 
+    void logUndo(string filename, string currentPath, string restoredPath) {
+        ofstream file(logFileName, ios::app);
+
+        if (file.is_open()) {
+            file << "Undo File: " << filename << "\n";
+            file << "From: " << currentPath << "\n";
+            file << "To: " << restoredPath << "\n";
+            file << "-----------------------------\n";
+            file.close();
+        }
+    }
+
     void logError(string filename) {
         ofstream file(logFileName, ios::app);
 
@@ -141,6 +153,7 @@ class Organizer {
 private:
     Rule rule;
     Logger& logger;
+    string undoFileName;
 
     int totalScanned;
     int totalMoved;
@@ -157,6 +170,7 @@ private:
 
 public:
     Organizer(Logger& logRef) : logger(logRef) {
+        undoFileName = "undo_data.txt";
         resetStats();
     }
 
@@ -200,6 +214,38 @@ public:
                 return tempName;
             }
             count++;
+        }
+    }
+
+    string getUndoRestoreName(string oldPath) {
+        if (!fs::exists(oldPath)) {
+            return oldPath;
+        }
+
+        fs::path originalPath(oldPath);
+        string folderPath = originalPath.parent_path().string();
+        string filename = originalPath.filename().string();
+
+        int count = 1;
+        while (true) {
+            string tempPath = folderPath + "/restored" + to_string(count) + "_" + filename;
+            if (!fs::exists(tempPath)) {
+                return tempPath;
+            }
+            count++;
+        }
+    }
+
+    void clearUndoFile() {
+        ofstream file(undoFileName, ios::out);
+        file.close();
+    }
+
+    void saveUndoInfo(string oldPath, string newPath) {
+        ofstream file(undoFileName, ios::app);
+        if (file.is_open()) {
+            file << oldPath << "|" << newPath << "\n";
+            file.close();
         }
     }
 
@@ -256,6 +302,7 @@ public:
 
     void organize(string path) {
         resetStats();
+        clearUndoFile();
 
         try {
             for (auto& entry : fs::directory_iterator(path)) {
@@ -285,6 +332,7 @@ public:
                         cout << endl;
 
                         logger.logMove(filename, oldPath, newPath, folder);
+                        saveUndoInfo(oldPath, newPath);
 
                         totalMoved++;
                         updateStats(folder);
@@ -303,6 +351,66 @@ public:
         catch (...) {
             cout << "Could not access directory.\n";
         }
+    }
+
+    void undoLastOrganization() {
+        ifstream file(undoFileName);
+        string line;
+
+        string oldPaths[500];
+        string newPaths[500];
+        int count = 0;
+
+        if (!file.is_open()) {
+            cout << "No undo information found.\n";
+            return;
+        }
+
+        while (getline(file, line)) {
+            if (line.length() > 0 && count < 500) {
+                int pos = line.find('|');
+                if (pos != string::npos) {
+                    oldPaths[count] = line.substr(0, pos);
+                    newPaths[count] = line.substr(pos + 1);
+                    count++;
+                }
+            }
+        }
+        file.close();
+
+        if (count == 0) {
+            cout << "No files available to undo.\n";
+            return;
+        }
+
+        cout << "\n===== Undo Last Organization =====\n";
+
+        for (int i = count - 1; i >= 0; i--) {
+            try {
+                if (fs::exists(newPaths[i])) {
+                    fs::path oldPath(oldPaths[i]);
+                    fs::create_directories(oldPath.parent_path());
+
+                    string restoredPath = getUndoRestoreName(oldPaths[i]);
+                    fs::rename(newPaths[i], restoredPath);
+
+                    cout << "Restored: " << fs::path(newPaths[i]).filename().string();
+
+                    if (restoredPath != oldPaths[i]) {
+                        cout << " (saved as " << fs::path(restoredPath).filename().string() << ")";
+                    }
+
+                    cout << endl;
+                    logger.logUndo(fs::path(newPaths[i]).filename().string(), newPaths[i], restoredPath);
+                }
+            }
+            catch (...) {
+                cout << "Could not restore file: " << fs::path(newPaths[i]).filename().string() << endl;
+            }
+        }
+
+        clearUndoFile();
+        cout << "Undo completed successfully!\n";
     }
 
     void showReport() {
@@ -391,8 +499,9 @@ public:
         cout << "Current Log File: " << logger.getLogFileName() << endl;
         cout << "1. View Files\n";
         cout << "2. Organize Files\n";
-        cout << "3. View Log\n";
-        cout << "4. Exit\n";
+        cout << "3. Undo Last Organization\n";
+        cout << "4. View Log\n";
+        cout << "5. Exit\n";
         cout << "Enter choice: ";
     }
 
@@ -422,10 +531,18 @@ public:
                     break;
 
                 case 3:
-                    logger.viewLog();
+                    if (askYesNo("Do you want to undo the last organization? (Y/N): ")) {
+                        organizer.undoLastOrganization();
+                    } else {
+                        cout << "Undo cancelled.\n";
+                    }
                     break;
 
                 case 4:
+                    logger.viewLog();
+                    break;
+
+                case 5:
                     cout << "Exiting program...\n";
                     break;
 
@@ -433,7 +550,7 @@ public:
                     cout << "Invalid choice.\n";
             }
 
-        } while (choice != 4);
+        } while (choice != 5);
     }
 };
 
