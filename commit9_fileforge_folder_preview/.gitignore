@@ -1,0 +1,20 @@
+# Build outputs
+build/
+*.o
+*.obj
+*.exe
+*.app
+*.user
+*.stash
+Makefile
+Makefile.Debug
+Makefile.Release
+moc_*.cpp
+moc_*.o
+
+# Qt Creator
+.qtcreator/
+
+# Logs created by app
+logs/
+*.txt
