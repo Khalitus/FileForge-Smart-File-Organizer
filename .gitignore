@@ -1,20 +1,20 @@
-# Build outputs
-build/
+# Temporary commit folders
+commit*_fileforge_*/
+
+# Wrong extracted duplicate files
+_*
+
+# Zip files
+*.zip
+
+# Qt and C++ build files
+build*/
+debug/
+release/
 *.o
 *.obj
 *.exe
 *.app
 *.user
-*.stash
+*.qmake.stash
 Makefile
-Makefile.Debug
-Makefile.Release
-moc_*.cpp
-moc_*.o
-
-# Qt Creator
-.qtcreator/
-
-# Logs created by app
-logs/
-*.txt
